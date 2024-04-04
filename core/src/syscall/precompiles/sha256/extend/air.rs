@@ -64,15 +64,6 @@ where
             local.is_real,
         );
 
-        // Read w[i-7].
-        builder.constraint_memory_access(
-            local.shard,
-            local.clk + (local.i - i_start),
-            local.w_ptr + (local.i - AB::F::from_canonical_u32(7)) * nb_bytes_in_word,
-            &local.w_i_minus_7,
-            local.is_real,
-        );
-
         // Compute `s0`.
         // s0 := w[i-15] rightshift 1
         FixedShiftRightOperation::<AB::F>::eval(
@@ -93,13 +84,23 @@ where
             local.is_real,
         );
 
-        // s2 := w[i-16] + s0 + w[i-7] + s1.
+        // Compute `s`.
+        // s := w[i-15] rightshift 3
+        FixedShiftRightOperation::<AB::F>::eval(
+            builder,
+            *local.w_i_minus_15.value(),
+            3,
+            local.s,
+            local.is_real,
+        );
+
+        // s2 := w[i-16] + s0 + s1 + s.
         Add4Operation::<AB::F>::eval(
             builder,
             *local.w_i_minus_16.value(),
             local.s0.value,
-            *local.w_i_minus_7.value(),
             local.s1.value,
+            local.s.value,
             local.is_real,
             local.s2,
         );

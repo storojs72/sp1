@@ -16,7 +16,6 @@ pub struct ShaExtendEvent {
     pub w_ptr: u32,
     pub w_i_minus_15_reads: Vec<MemoryReadRecord>,
     pub w_i_minus_16_reads: Vec<MemoryReadRecord>,
-    pub w_i_minus_7_reads: Vec<MemoryReadRecord>,
     pub w_i_writes: Vec<MemoryWriteRecord>,
 }
 
@@ -47,7 +46,9 @@ pub fn sha_extend(w: &mut [u32]) {
     for i in 16..64 {
         let s0 = w[i - 15] >> 1;
         let s1 = w[i - 15] >> 2;
-        w[i] = w[i - 16] + s0 + w[i - 7] + s1;
+        let s = w[i - 15] >> 3;
+
+        w[i] = w[i - 16] + s0 + s1 + s;
     }
 }
 

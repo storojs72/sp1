@@ -41,11 +41,12 @@ pub struct ShaExtendCols<T> {
     pub s0: FixedShiftRightOperation<T>,
     /// `s1 := w[i-15] >> 2`.
     pub s1: FixedShiftRightOperation<T>,
+    /// `s := w[i-15] >> 3`.
+    pub s: FixedShiftRightOperation<T>,
 
     /// Inputs to `s2`.
     pub w_i_minus_16: MemoryReadCols<T>,
-    pub w_i_minus_7: MemoryReadCols<T>,
-    /// `w[i] := w[i-16] + s0 + w[i-7] + s1`.
+    /// `w[i] := w[i-16] + s0 + s1 + s`.
     pub s2: Add4Operation<T>,
 
     /// Result.
