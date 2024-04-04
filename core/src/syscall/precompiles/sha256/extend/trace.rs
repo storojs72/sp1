@@ -35,8 +35,6 @@ impl<F: PrimeField32> MachineAir<F> for ShaExtendChip {
 
                 cols.w_i_minus_15
                     .populate(event.w_i_minus_15_reads[j], &mut new_byte_lookup_events);
-                cols.w_i_minus_2
-                    .populate(event.w_i_minus_2_reads[j], &mut new_byte_lookup_events);
                 cols.w_i_minus_16
                     .populate(event.w_i_minus_16_reads[j], &mut new_byte_lookup_events);
                 cols.w_i_minus_7
@@ -46,15 +44,8 @@ impl<F: PrimeField32> MachineAir<F> for ShaExtendChip {
                 let w_i_minus_15 = event.w_i_minus_15_reads[j].value;
                 let s0 = cols.s0.populate(output, w_i_minus_15, 1);
 
-                // `s1 := (w[i-2] rightrotate 17) xor (w[i-2] rightrotate 19) xor (w[i-2] rightshift 10)`.
-                let w_i_minus_2 = event.w_i_minus_2_reads[j].value;
-                let w_i_minus_2_rr_17 = cols.w_i_minus_2_rr_17.populate(output, w_i_minus_2, 17);
-                let w_i_minus_2_rr_19 = cols.w_i_minus_2_rr_19.populate(output, w_i_minus_2, 19);
-                let w_i_minus_2_rs_10 = cols.w_i_minus_2_rs_10.populate(output, w_i_minus_2, 10);
-                let s1_intermediate =
-                    cols.s1_intermediate
-                        .populate(output, w_i_minus_2_rr_17, w_i_minus_2_rr_19);
-                let s1 = cols.s1.populate(output, s1_intermediate, w_i_minus_2_rs_10);
+                // `s1 := w[i-2] rightshift 2`.
+                let s1 = cols.s1.populate(output, w_i_minus_15, 2);
 
                 // Compute `s2`.
                 let w_i_minus_7 = event.w_i_minus_7_reads[j].value;
