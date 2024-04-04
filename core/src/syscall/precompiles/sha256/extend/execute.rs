@@ -1,3 +1,4 @@
+use std::ops::BitXor;
 use crate::{
     runtime::Syscall,
     syscall::precompiles::{sha256::ShaExtendEvent, SyscallContext},
@@ -19,7 +20,6 @@ impl Syscall for ShaExtendChip {
 
         let w_ptr_init = w_ptr;
         let mut w_i_minus_15_reads = Vec::new();
-        let mut w_i_minus_16_reads = Vec::new();
         let mut w_i_writes = Vec::new();
         for i in 16..64 {
             // Read w[i-15].
@@ -35,15 +35,11 @@ impl Syscall for ShaExtendChip {
             // Compute `s`.
             let s = w_i_minus_15 >> 3;
 
-            // Read w[i-16].
-            let (record, w_i_minus_16) = rt.mr(w_ptr + (i - 16) * 4);
-            w_i_minus_16_reads.push(record);
-
             // Compute `w_i`.
             let w_i = s1
-                .wrapping_add(w_i_minus_16)
-                .wrapping_add(s0)
-                .wrapping_add(s);
+                .bitxor(w_i_minus_15)
+                .bitxor(s0)
+                .bitxor(s);
 
             // Write w[i].
             w_i_writes.push(rt.mw(w_ptr + i * 4, w_i));
@@ -57,7 +53,6 @@ impl Syscall for ShaExtendChip {
             clk: clk_init,
             w_ptr: w_ptr_init,
             w_i_minus_15_reads,
-            w_i_minus_16_reads,
             w_i_writes,
         });
 
