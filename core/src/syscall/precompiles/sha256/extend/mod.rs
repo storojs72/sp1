@@ -15,7 +15,7 @@ pub struct ShaExtendEvent {
     pub clk: u32,
     pub w_ptr: u32,
     pub w_0_reads: Vec<MemoryReadRecord>,
-    pub w_16_writes: Vec<MemoryWriteRecord>,
+    pub w_1_writes: Vec<MemoryWriteRecord>,
 }
 
 /// Implements the SHA extension operation which loops over i = [16, 63] and modifies w[i] in each
@@ -33,22 +33,12 @@ impl ShaExtendChip {
 }
 
 pub fn sha_extend(w: &mut [u32]) {
-    /*
-    let a = 800;
-    let a_right_shift_1 = a >> 1;
-    let a_right_shift_2 = a >> 2;
-    let a_right_shift_3 = a >> 3;
+    assert!(w.len() >= 2);
+    let s0 = w[0] >> 1;
+    let s1 = w[0] >> 2;
+    let s = w[0] >> 3;
 
-    let output = a ^ a_right_shift_1 ^ a_right_shift_2 ^ a_right_shift_3;
-    */
-
-    for _ in 16..64 {
-        let s0 = w[0] >> 1;
-        let s1 = w[0] >> 2;
-        let s = w[0] >> 3;
-
-        w[16] = w[0] ^ s0 ^ s1 ^ s;
-    }
+    w[1] = w[0] ^ s0 ^ s1 ^ s;
 }
 
 #[cfg(test)]
@@ -67,6 +57,7 @@ pub mod extend_tests {
             tests::{SHA2_ELF, SHA_EXTEND_ELF},
         },
     };
+    use crate::runtime::MemoryRecord;
     use crate::syscall::precompiles::sha256::sha_extend;
     use crate::utils::run_test_custom;
 
@@ -74,9 +65,9 @@ pub mod extend_tests {
 
     pub fn sha_extend_program_custom(w_ptr: u32, value: u32) -> Program {
         let mut instructions = vec![Instruction::new(Opcode::ADD, 29, 0, value, false, true)];
-        for i in 0..64 {
+        for i in 0..2 {
             instructions.extend(vec![
-                Instruction::new(Opcode::ADD, 30, 0, w_ptr + i * 4, false, true),
+                Instruction::new(Opcode::ADD, 30, 0, w_ptr, false, true),
                 Instruction::new(Opcode::SW, 29, 30, 0, false, true),
             ]);
         }
@@ -102,20 +93,16 @@ pub mod extend_tests {
         let w_ptr = 100;
         let a = 800;
 
-
         let program = sha_extend_program_custom(w_ptr, a);
         let (_, memory) = run_test_custom(program);
 
         let mut w_computed = vec![];
-        for i in 0..64 {
+        for i in 0..2 {
             w_computed.push(memory.get(&(w_ptr + i * 4)).unwrap().value.clone());
         }
 
-        let mut w_expected = vec![a; 64];
+        let mut w_expected = vec![a; 2];
         sha_extend(&mut w_expected);
-
-        println!("expected: {:?}", w_expected);
-        println!("computed: {:?}", w_computed);
 
         assert_eq!(w_computed, w_expected);
     }

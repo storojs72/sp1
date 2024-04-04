@@ -20,8 +20,8 @@ impl Syscall for ShaExtendChip {
 
         let w_ptr_init = w_ptr;
         let mut w_0_reads = Vec::new();
-        let mut w_16_writes = Vec::new();
-        for i in 16..64 {
+        let mut w_1_writes = Vec::new();
+        for _ in 16..64 {
             // Read w[0].
             let (record, w_0) = rt.mr(w_ptr);
             w_0_reads.push(record);
@@ -36,13 +36,13 @@ impl Syscall for ShaExtendChip {
             let s = w_0 >> 3;
 
             // Compute `w_i`.
-            let w_16 = s1
+            let w_1 = s1
                 .bitxor(w_0)
                 .bitxor(s0)
                 .bitxor(s);
 
             // Write w[16].
-            w_16_writes.push(rt.mw(w_ptr + 16 * 4, w_16));
+            w_1_writes.push(rt.mw(w_ptr + 1 * 4, w_1));
             rt.clk += 1;
         }
 
@@ -53,7 +53,7 @@ impl Syscall for ShaExtendChip {
             clk: clk_init,
             w_ptr: w_ptr_init,
             w_0_reads,
-            w_16_writes,
+            w_1_writes,
         });
 
         None

@@ -112,12 +112,12 @@ where
             local.is_real
         );
 
-        // Write `s2` to `w[16]`.
+        // Write `s2` to `w[1]`.
         builder.constraint_memory_access(
             local.shard,
             local.clk + (local.i - i_start),
-            local.w_ptr + AB::F::from_canonical_u32(16) * nb_bytes_in_word,
-            &local.w_16,
+            local.w_ptr + AB::F::from_canonical_u32(1) * nb_bytes_in_word,
+            &local.w_1,
             local.is_real,
         );
 

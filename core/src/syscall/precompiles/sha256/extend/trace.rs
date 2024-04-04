@@ -51,8 +51,8 @@ impl<F: PrimeField32> MachineAir<F> for ShaExtendChip {
                 let s2_intermediate_2 = cols.s2_intermediate_2.populate(output, s1, s);
                 cols.s2.populate(output, s2_intermediate_1, s2_intermediate_2);
 
-                cols.w_16
-                    .populate(event.w_16_writes[j], &mut new_byte_lookup_events);
+                cols.w_1
+                    .populate(event.w_1_writes[j], &mut new_byte_lookup_events);
 
                 rows.push(row);
             }
