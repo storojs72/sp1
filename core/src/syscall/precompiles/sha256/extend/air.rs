@@ -83,43 +83,11 @@ where
         );
 
         // Compute `s0`.
-        // w[i-15] rightrotate 7.
-        FixedRotateRightOperation::<AB::F>::eval(
-            builder,
-            *local.w_i_minus_15.value(),
-            7,
-            local.w_i_minus_15_rr_7,
-            local.is_real,
-        );
-        // w[i-15] rightrotate 18.
-        FixedRotateRightOperation::<AB::F>::eval(
-            builder,
-            *local.w_i_minus_15.value(),
-            18,
-            local.w_i_minus_15_rr_18,
-            local.is_real,
-        );
-        // w[i-15] rightshift 3.
+        // s0 := w[i-15] rightshift 1
         FixedShiftRightOperation::<AB::F>::eval(
             builder,
             *local.w_i_minus_15.value(),
-            3,
-            local.w_i_minus_15_rs_3,
-            local.is_real,
-        );
-        // (w[i-15] rightrotate 7) xor (w[i-15] rightrotate 18)
-        XorOperation::<AB::F>::eval(
-            builder,
-            local.w_i_minus_15_rr_7.value,
-            local.w_i_minus_15_rr_18.value,
-            local.s0_intermediate,
-            local.is_real,
-        );
-        // s0 := (w[i-15] rightrotate 7) xor (w[i-15] rightrotate 18) xor (w[i-15] rightshift 3)
-        XorOperation::<AB::F>::eval(
-            builder,
-            local.s0_intermediate.value,
-            local.w_i_minus_15_rs_3.value,
+            1,
             local.s0,
             local.is_real,
         );

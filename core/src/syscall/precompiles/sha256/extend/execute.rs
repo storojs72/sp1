@@ -29,8 +29,7 @@ impl Syscall for ShaExtendChip {
             w_i_minus_15_reads.push(record);
 
             // Compute `s0`.
-            let s0 =
-                w_i_minus_15.rotate_right(7) ^ w_i_minus_15.rotate_right(18) ^ (w_i_minus_15 >> 3);
+            let s0 = w_i_minus_15 >> 1;
 
             // Read w[i-2].
             let (record, w_i_minus_2) = rt.mr(w_ptr + (i - 2) * 4);

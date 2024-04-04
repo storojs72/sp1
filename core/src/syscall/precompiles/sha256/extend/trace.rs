@@ -42,15 +42,9 @@ impl<F: PrimeField32> MachineAir<F> for ShaExtendChip {
                 cols.w_i_minus_7
                     .populate(event.w_i_minus_7_reads[j], &mut new_byte_lookup_events);
 
-                // `s0 := (w[i-15] rightrotate 7) xor (w[i-15] rightrotate 18) xor (w[i-15] rightshift 3)`.
+                // `s0 := w[i-15] rightshift 1`.
                 let w_i_minus_15 = event.w_i_minus_15_reads[j].value;
-                let w_i_minus_15_rr_7 = cols.w_i_minus_15_rr_7.populate(output, w_i_minus_15, 7);
-                let w_i_minus_15_rr_18 = cols.w_i_minus_15_rr_18.populate(output, w_i_minus_15, 18);
-                let w_i_minus_15_rs_3 = cols.w_i_minus_15_rs_3.populate(output, w_i_minus_15, 3);
-                let s0_intermediate =
-                    cols.s0_intermediate
-                        .populate(output, w_i_minus_15_rr_7, w_i_minus_15_rr_18);
-                let s0 = cols.s0.populate(output, s0_intermediate, w_i_minus_15_rs_3);
+                let s0 = cols.s0.populate(output, w_i_minus_15, 1);
 
                 // `s1 := (w[i-2] rightrotate 17) xor (w[i-2] rightrotate 19) xor (w[i-2] rightshift 10)`.
                 let w_i_minus_2 = event.w_i_minus_2_reads[j].value;

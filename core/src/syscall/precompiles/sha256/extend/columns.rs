@@ -40,8 +40,8 @@ pub struct ShaExtendCols<T> {
     pub w_i_minus_15_rr_18: FixedRotateRightOperation<T>,
     pub w_i_minus_15_rs_3: FixedShiftRightOperation<T>,
     pub s0_intermediate: XorOperation<T>,
-    /// `s0 := (w[i-15] rightrotate  7) xor (w[i-15] rightrotate 18) xor (w[i-15] rightshift 3)`.
-    pub s0: XorOperation<T>,
+    /// `s0 = w[i-15] >> 1`
+    pub s0: FixedShiftRightOperation<T>,
 
     /// Inputs to `s1`.
     pub w_i_minus_2: MemoryReadCols<T>,
