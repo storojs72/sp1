@@ -33,26 +33,26 @@ impl<F: PrimeField32> MachineAir<F> for ShaExtendChip {
                 cols.clk = F::from_canonical_u32(event.clk);
                 cols.w_ptr = F::from_canonical_u32(event.w_ptr);
 
-                cols.w_i_minus_15
-                    .populate(event.w_i_minus_15_reads[j], &mut new_byte_lookup_events);
+                cols.w_0
+                    .populate(event.w_0_reads[j], &mut new_byte_lookup_events);
 
-                // `s0 := w[i-15] rightshift 1`.
-                let w_i_minus_15 = event.w_i_minus_15_reads[j].value;
-                let s0 = cols.s0.populate(output, w_i_minus_15, 1);
+                // `s0 := w[0] rightshift 1`.
+                let w_0 = event.w_0_reads[j].value;
+                let s0 = cols.s0.populate(output, w_0, 1);
 
-                // `s1 := w[i-15] rightshift 2`.
-                let s1 = cols.s1.populate(output, w_i_minus_15, 2);
+                // `s1 := w[0] rightshift 2`.
+                let s1 = cols.s1.populate(output, w_0, 2);
 
                 // `s := w[i-15] rightshift 3`.
-                let s = cols.s.populate(output, w_i_minus_15, 3);
+                let s = cols.s.populate(output, w_0, 3);
 
                 // Compute `s2`.
-                let s2_intermediate_1 = cols.s2_intermediate_1.populate(output, w_i_minus_15, s0);
+                let s2_intermediate_1 = cols.s2_intermediate_1.populate(output, w_0, s0);
                 let s2_intermediate_2 = cols.s2_intermediate_2.populate(output, s1, s);
                 cols.s2.populate(output, s2_intermediate_1, s2_intermediate_2);
 
-                cols.w_i
-                    .populate(event.w_i_writes[j], &mut new_byte_lookup_events);
+                cols.w_16
+                    .populate(event.w_16_writes[j], &mut new_byte_lookup_events);
 
                 rows.push(row);
             }

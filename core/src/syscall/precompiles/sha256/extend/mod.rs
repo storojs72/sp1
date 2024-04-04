@@ -14,8 +14,8 @@ pub struct ShaExtendEvent {
     pub shard: u32,
     pub clk: u32,
     pub w_ptr: u32,
-    pub w_i_minus_15_reads: Vec<MemoryReadRecord>,
-    pub w_i_writes: Vec<MemoryWriteRecord>,
+    pub w_0_reads: Vec<MemoryReadRecord>,
+    pub w_16_writes: Vec<MemoryWriteRecord>,
 }
 
 /// Implements the SHA extension operation which loops over i = [16, 63] and modifies w[i] in each
@@ -42,12 +42,12 @@ pub fn sha_extend(w: &mut [u32]) {
     let output = a ^ a_right_shift_1 ^ a_right_shift_2 ^ a_right_shift_3;
     */
 
-    for i in 16..64 {
-        let s0 = w[i - 15] >> 1;
-        let s1 = w[i - 15] >> 2;
-        let s = w[i - 15] >> 3;
+    for _ in 16..64 {
+        let s0 = w[0] >> 1;
+        let s1 = w[0] >> 2;
+        let s = w[0] >> 3;
 
-        w[i] = w[i - 15] ^ s0 ^ s1 ^ s;
+        w[16] = w[0] ^ s0 ^ s1 ^ s;
     }
 }
 

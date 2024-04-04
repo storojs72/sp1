@@ -35,7 +35,7 @@ pub struct ShaExtendCols<T> {
     pub cycle_48_end: T,
 
     /// Inputs to `s0`, `s1`, `s2`.
-    pub w_i_minus_15: MemoryReadCols<T>,
+    pub w_0: MemoryReadCols<T>,
 
     /// `s0 = w[i-15] >> 1`
     pub s0: FixedShiftRightOperation<T>,
@@ -50,7 +50,7 @@ pub struct ShaExtendCols<T> {
     pub s2: XorOperation<T>,
 
     /// Result.
-    pub w_i: MemoryWriteCols<T>,
+    pub w_16: MemoryWriteCols<T>,
 
     /// Selector.
     pub is_real: T,

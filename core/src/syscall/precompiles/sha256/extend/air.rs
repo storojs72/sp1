@@ -46,49 +46,49 @@ where
             .when_not(local.cycle_16_end.result * local.cycle_48[2])
             .assert_eq(local.w_ptr, next.w_ptr);
 
-        // Read w[i-15].
+        // Read w[0].
         builder.constraint_memory_access(
             local.shard,
             local.clk + (local.i - i_start),
-            local.w_ptr + (local.i - AB::F::from_canonical_u32(15)) * nb_bytes_in_word,
-            &local.w_i_minus_15,
+            local.w_ptr,
+            &local.w_0,
             local.is_real,
         );
 
         // Compute `s0`.
-        // s0 := w[i-15] rightshift 1
+        // s0 := w[0] rightshift 1
         FixedShiftRightOperation::<AB::F>::eval(
             builder,
-            *local.w_i_minus_15.value(),
+            *local.w_0.value(),
             1,
             local.s0,
             local.is_real,
         );
 
         // Compute `s1`.
-        // s1 := w[i-15] rightshift 2
+        // s1 := w[0] rightshift 2
         FixedShiftRightOperation::<AB::F>::eval(
             builder,
-            *local.w_i_minus_15.value(),
+            *local.w_0.value(),
             2,
             local.s1,
             local.is_real,
         );
 
         // Compute `s`.
-        // s := w[i-15] rightshift 3
+        // s := w[0] rightshift 3
         FixedShiftRightOperation::<AB::F>::eval(
             builder,
-            *local.w_i_minus_15.value(),
+            *local.w_0.value(),
             3,
             local.s,
             local.is_real,
         );
 
-        // s2_intermediate_1 := w[i-15] ^ s0
+        // s2_intermediate_1 := w[0] ^ s0
         XorOperation::<AB::F>::eval(
             builder,
-            *local.w_i_minus_15.value(),
+            *local.w_0.value(),
             local.s0.value,
             local.s2_intermediate_1,
             local.is_real
@@ -112,12 +112,12 @@ where
             local.is_real
         );
 
-        // Write `s2` to `w[i]`.
+        // Write `s2` to `w[16]`.
         builder.constraint_memory_access(
             local.shard,
             local.clk + (local.i - i_start),
-            local.w_ptr + local.i * nb_bytes_in_word,
-            &local.w_i,
+            local.w_ptr + AB::F::from_canonical_u32(16) * nb_bytes_in_word,
+            &local.w_16,
             local.is_real,
         );
 
