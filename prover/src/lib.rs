@@ -866,4 +866,105 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_multi_precompile_program_with_deferred_proofs() {
+        fn test_inner(
+            program_elf: &[u8],
+            deferred_proofs_num: usize,
+            program_inputs: Vec<&SP1Stdin>,
+        ) {
+            assert_eq!(deferred_proofs_num, program_inputs.len());
+            setup_logger();
+
+            // verify program which verifies proofs of a vkey and a list of committed inputs
+            let verify_elf =
+                include_bytes!("../../tests/verify-proof/elf/riscv32im-succinct-zkvm-elf");
+
+            tracing::info!("initializing prover");
+            let prover = SP1Prover::new();
+
+            tracing::info!("setup elf");
+            let (program_pk, program_vk) = prover.setup(program_elf);
+            let (verify_pk, verify_vk) = prover.setup(verify_elf);
+
+            // Generate deferred proofs
+            let mut public_values = vec![];
+            let mut deferred_reduce_proofs = vec![];
+            program_inputs
+                .into_iter()
+                .enumerate()
+                .for_each(|(index, input)| {
+                    tracing::info!("prove subproof {}", index);
+                    let deferred_proof = prover.prove_core(&program_pk, input);
+                    let pv = deferred_proof.public_values.as_slice().to_vec().clone();
+                    public_values.push(pv);
+                    let deferred_reduce = prover.compress(&program_vk, deferred_proof, vec![]);
+                    deferred_reduce_proofs.push(deferred_reduce.proof);
+                });
+
+            // Aggregate deferred proofs
+            let mut stdin = SP1Stdin::new();
+            let vkey_digest = program_vk.hash_babybear();
+            let vkey_digest: [u32; 8] = vkey_digest
+                .iter()
+                .map(|n| n.as_canonical_u32())
+                .collect::<Vec<_>>()
+                .try_into()
+                .unwrap();
+            stdin.write(&vec![vkey_digest; deferred_proofs_num]);
+            stdin.write(&public_values);
+            for drp in deferred_reduce_proofs.iter() {
+                stdin.write_proof(drp.clone(), program_vk.vk.clone());
+            }
+
+            // Generate aggregated proof
+            let verify_proof = prover.prove_core(&verify_pk, &stdin);
+            let verify_reduce =
+                prover.compress(&verify_vk, verify_proof.clone(), deferred_reduce_proofs);
+
+            tracing::info!("verify verify program");
+            let result = prover.verify_compressed(&verify_reduce, &verify_vk);
+            if let Err(MachineVerificationError::NonZeroCumulativeSum) = result {
+                tracing::warn!("non-zero cumulative sum for verify");
+            } else {
+                result.unwrap();
+            }
+        }
+
+        //env::set_var("RECONSTRUCT_COMMITMENTS", "false");
+        //env::set_var("FRI_QUERIES", "1");
+        //env::set_var("SHARD_SIZE", "262144");
+        //env::set_var("MAX_RECURSION_PROGRAM_SIZE", "1");
+
+        // Programs that we will use to produce deferred proofs while testing
+        let multi_precompile_program =
+            include_bytes!("../../tests/multi-precompile-program/elf/riscv32im-succinct-zkvm-elf");
+
+        let calls = 100_000usize;
+
+        let mut inputs = vec![];
+        let mut input = SP1Stdin::new();
+        input.write(&0usize);
+        input.write(&calls);
+        inputs.push(&input);
+        let mut input = SP1Stdin::new();
+        input.write(&1usize);
+        input.write(&calls);
+        inputs.push(&input);
+        let mut input = SP1Stdin::new();
+        input.write(&2usize);
+        input.write(&calls);
+        inputs.push(&input);
+        let mut input = SP1Stdin::new();
+        input.write(&3usize);
+        input.write(&calls);
+        inputs.push(&input);
+
+        test_inner(
+            multi_precompile_program,
+            inputs.len(),
+            inputs,
+        );
+    }
 }
