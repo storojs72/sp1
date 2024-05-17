@@ -17,13 +17,14 @@ fn words_to_bytes(words: &[u32; 8]) -> [u8; 32] {
 }
 
 pub fn main() {
-    let vkey = sp1_zkvm::io::read::<[u32; 8]>();
-    println!("Read vkey: {:?}", hex::encode(words_to_bytes(&vkey)));
+    let v_keys = sp1_zkvm::io::read::<Vec<[u32; 8]>>();
     let inputs = sp1_zkvm::io::read::<Vec<Vec<u8>>>();
-    inputs.iter().for_each(|input| {
+    assert_eq!(v_keys.len(), inputs.len());
+
+    inputs.iter().zip(v_keys.iter()).for_each(|(input, v_key)| {
         // Get expected pv_digest hash: sha256(input)
         let pv_digest = Sha256::digest(input);
-        verify_sp1_proof(&vkey, &pv_digest.into());
+        verify_sp1_proof(&v_key, &pv_digest.into());
 
         println!("Verified proof for digest: {:?}", hex::encode(pv_digest));
         println!("Verified input: {:?}", hex::encode(input));
