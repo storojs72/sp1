@@ -11,17 +11,17 @@ use serde::Serialize;
 use size::Size;
 use thiserror::Error;
 
-use crate::air::MachineAir;
+use crate::air::{MachineAir, SP1_PROOF_NUM_PV_ELTS};
 use crate::io::{SP1PublicValues, SP1Stdin};
 use crate::lookup::InteractionBuilder;
 use crate::runtime::ExecutionError;
 use crate::runtime::{ExecutionRecord, ShardingConfig};
-use crate::stark::DebugConstraintBuilder;
 use crate::stark::MachineProof;
 use crate::stark::ProverConstraintFolder;
 use crate::stark::StarkVerifyingKey;
 use crate::stark::Val;
 use crate::stark::VerifierConstraintFolder;
+use crate::stark::{Chip, DebugConstraintBuilder};
 use crate::stark::{Com, PcsProverData, RiscvAir, ShardProof, StarkProvingKey, UniConfig};
 use crate::stark::{MachineRecord, StarkMachine};
 use crate::utils::SP1CoreOpts;
@@ -230,6 +230,44 @@ where
     Ok((proof, public_values_stream))
 }
 
+pub fn run_test_io_custom(
+    program: Program,
+    inputs: SP1Stdin,
+    chip_names_to_deactivate: Vec<&str>,
+) -> Result<SP1PublicValues, crate::stark::MachineVerificationError<BabyBearPoseidon2>> {
+    let runtime = tracing::info_span!("runtime.run(...)").in_scope(|| {
+        let mut runtime = Runtime::new(program);
+        runtime.write_vecs(&inputs.buffer);
+        runtime.run();
+        runtime
+    });
+    let public_values = SP1PublicValues::from(&runtime.state.public_values_stream);
+
+    let config = BabyBearPoseidon2::new();
+
+    let machine = {
+        let mut chips = RiscvAir::get_all()
+            .into_iter()
+            .map(Chip::new)
+            .collect::<Vec<_>>();
+
+        // deactivate chips specified by names from input
+        for chip_name in chip_names_to_deactivate.into_iter() {
+            chips.retain(|chip| chip.name() != chip_name.to_string())
+        }
+
+        StarkMachine::new(config, chips, SP1_PROOF_NUM_PV_ELTS)
+    };
+
+    let (pk, vk) = machine.setup(runtime.program.as_ref());
+
+    let record = runtime.record;
+
+    let _ = run_test_machine(record, machine, pk, vk)?;
+
+    Ok(public_values)
+}
+
 /// Runs a program and returns the public values stream.
 pub fn run_test_io(
     program: Program,
@@ -315,7 +353,7 @@ where
     let mut challenger = machine.config().challenger();
     machine.verify(&vk, &proof, &mut challenger)?;
 
-    tracing::info!(
+    tracing::warn!(
         "summary: cycles={}, e2e={}, khz={:.2}, proofSize={}",
         cycles,
         time,

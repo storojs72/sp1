@@ -961,10 +961,6 @@ mod tests {
         input.write(&calls);
         inputs.push(&input);
 
-        test_inner(
-            multi_precompile_program,
-            inputs.len(),
-            inputs,
-        );
+        test_inner(multi_precompile_program, inputs.len(), inputs);
     }
 }

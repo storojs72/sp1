@@ -49,7 +49,7 @@ pub struct StarkMachine<SC: StarkGenericConfig, A> {
     /// The STARK settings for the RISC-V STARK.
     config: SC,
     /// The chips that make up the RISC-V STARK machine, in order of their execution.
-    chips: Vec<Chip<Val<SC>, A>>,
+    pub chips: Vec<Chip<Val<SC>, A>>,
 
     /// The number of public values elements that the machine uses
     num_pv_elts: usize,
