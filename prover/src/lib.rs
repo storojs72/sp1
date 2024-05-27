@@ -22,14 +22,20 @@ use std::path::Path;
 use p3_baby_bear::BabyBear;
 use p3_challenger::CanObserve;
 use p3_field::{AbstractField, PrimeField};
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rayon::prelude::*;
 use sp1_core::air::{PublicValues, Word};
-pub use sp1_core::io::{SP1PublicValues, SP1Stdin};
 use sp1_core::runtime::{ExecutionError, ExecutionReport, Runtime};
-use sp1_core::stark::{Challenge, StarkProvingKey};
 use sp1_core::stark::{Challenger, MachineVerificationError};
 use sp1_core::utils::{SP1CoreOpts, DIGEST_SIZE};
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
+use size::Size;
+use sp1_core::air::{MachineAir, SP1_PROOF_NUM_PV_ELTS};
+pub use sp1_core::io::{SP1PublicValues, SP1Stdin};
+use sp1_core::stark::{
+    Challenge, Chip, Com, Domain, PcsProverData, Prover, ShardMainData, StarkProvingKey,
+};
 use sp1_core::{
     runtime::Program,
     stark::{
@@ -57,6 +63,7 @@ pub use sp1_recursion_program::machine::{
     SP1DeferredMemoryLayout, SP1RecursionMemoryLayout, SP1ReduceMemoryLayout, SP1RootMemoryLayout,
 };
 use tracing::instrument;
+use sp1_recursion_core::stark::{RecursionAirSkinnyDeg7, RecursionAirWideDeg3};
 pub use types::*;
 use utils::words_to_bytes;
 
@@ -164,6 +171,77 @@ impl SP1Prover {
         let shrink_program =
             SP1RootVerifier::<InnerConfig, _, _>::build(&compress_machine, &compress_vk, true);
         let shrink_machine = CompressAir::wrap_machine_dyn(InnerSC::compressed());
+        let (shrink_pk, shrink_vk) = shrink_machine.setup(&shrink_program);
+
+        // Get the wrap program, machine, and keys.
+        let wrap_program =
+            SP1RootVerifier::<InnerConfig, _, _>::build(&shrink_machine, &shrink_vk, false);
+        let wrap_machine = WrapAir::wrap_machine(OuterSC::default());
+        let (wrap_pk, wrap_vk) = wrap_machine.setup(&wrap_program);
+
+        Self {
+            recursion_program,
+            rec_pk,
+            rec_vk,
+            deferred_program,
+            deferred_pk,
+            deferred_vk,
+            compress_program,
+            compress_pk,
+            compress_vk,
+            shrink_program,
+            shrink_pk,
+            shrink_vk,
+            wrap_program,
+            wrap_pk,
+            wrap_vk,
+            core_machine,
+            compress_machine,
+            shrink_machine,
+            wrap_machine,
+        }
+    }
+
+    /// Initializes a new [SP1Prover].
+    #[instrument(name = "initialize prover", level = "info", skip_all)]
+    pub fn new_with_some_chips_disabled(chips_to_disable: Vec<&str>) -> Self {
+        //let core_machine = RiscvAir::machine(CoreSC::default());
+        let core_machine = {
+            let mut chips = RiscvAir::get_all()
+                .into_iter()
+                .map(Chip::new)
+                .collect::<Vec<_>>();
+
+            // deactivate chips specified by names from input
+            for chip_name in chips_to_disable.into_iter() {
+                chips.retain(|chip| chip.name() != chip_name.to_string())
+            }
+
+            StarkMachine::new(CoreSC::default(), chips, SP1_PROOF_NUM_PV_ELTS)
+        };
+
+
+        // Get the recursive verifier and setup the proving and verifying keys.
+        let recursion_program = SP1RecursiveVerifier::<InnerConfig, _>::build(&core_machine);
+        let compress_machine = ReduceAir::machine(InnerSC::default());
+        let (rec_pk, rec_vk) = compress_machine.setup(&recursion_program);
+
+        // Get the deferred program and keys.
+        let deferred_program = SP1DeferredVerifier::<InnerConfig, _, _>::build(&compress_machine);
+        let (deferred_pk, deferred_vk) = compress_machine.setup(&deferred_program);
+
+        // Make the reduce program and keys.
+        let compress_program = SP1CompressVerifier::<InnerConfig, _, _>::build(
+            &compress_machine,
+            &rec_vk,
+            &deferred_vk,
+        );
+        let (compress_pk, compress_vk) = compress_machine.setup(&compress_program);
+
+        // Get the compress program, machine, and keys.
+        let shrink_program =
+            SP1RootVerifier::<InnerConfig, _, _>::build(&compress_machine, &compress_vk, true);
+        let shrink_machine = CompressAir::machine(InnerSC::compressed());
         let (shrink_pk, shrink_vk) = shrink_machine.setup(&shrink_program);
 
         // Get the wrap program, machine, and keys.
@@ -695,6 +773,7 @@ mod tests {
 
     use std::fs::File;
     use std::io::{Read, Write};
+    use std::time::Instant;
 
     use self::build::try_build_plonk_bn254_artifacts_dev;
     use super::*;
@@ -896,10 +975,10 @@ mod tests {
                 .enumerate()
                 .for_each(|(index, input)| {
                     tracing::info!("prove subproof {}", index);
-                    let deferred_proof = prover.prove_core(&program_pk, input);
+                    let deferred_proof = prover.prove_core(&program_pk, input).unwrap();
                     let pv = deferred_proof.public_values.as_slice().to_vec().clone();
                     public_values.push(pv);
-                    let deferred_reduce = prover.compress(&program_vk, deferred_proof, vec![]);
+                    let deferred_reduce = prover.compress(&program_vk, deferred_proof, vec![]).unwrap();
                     deferred_reduce_proofs.push(deferred_reduce.proof);
                 });
 
@@ -919,17 +998,17 @@ mod tests {
             }
 
             // Generate aggregated proof
-            let verify_proof = prover.prove_core(&verify_pk, &stdin);
+            let verify_proof = prover.prove_core(&verify_pk, &stdin).unwrap();
             let verify_reduce =
-                prover.compress(&verify_vk, verify_proof.clone(), deferred_reduce_proofs);
+                prover.compress(&verify_vk, verify_proof.clone(), deferred_reduce_proofs).unwrap();
+
+            let reduce_pv: &RecursionPublicValues<_> =
+                verify_reduce.proof.public_values.as_slice().borrow();
+            println!("deferred_hash: {:?}", reduce_pv.deferred_proofs_digest);
+            println!("complete: {:?}", reduce_pv.is_complete);
 
             tracing::info!("verify verify program");
-            let result = prover.verify_compressed(&verify_reduce, &verify_vk);
-            if let Err(MachineVerificationError::NonZeroCumulativeSum) = result {
-                tracing::warn!("non-zero cumulative sum for verify");
-            } else {
-                result.unwrap();
-            }
+            prover.verify_compressed(&verify_reduce, &verify_vk)?;
         }
 
         //env::set_var("RECONSTRUCT_COMMITMENTS", "false");
@@ -962,5 +1041,137 @@ mod tests {
         inputs.push(&input);
 
         test_inner(multi_precompile_program, inputs.len(), inputs);
+    }
+
+    #[test]
+    fn test_multi_precompile_program_with_patched_stark_machine() {
+        setup_logger();
+
+        fn run_experiment(name: String, chips_to_deactivate: Vec<&str>, input: SP1Stdin) {
+            let multi_precompile_program = include_bytes!(
+                "../../tests/multi-precompile-program/elf/riscv32im-succinct-zkvm-elf"
+            );
+
+            // run test with all precompiles/chips enabled
+            let prover = SP1Prover::new();
+            let (pk, vk) = prover.setup(multi_precompile_program);
+            let start = Instant::now();
+            let core_proof = prover.prove_core(&pk, &input).unwrap();
+            let prove_core_took = start.elapsed();
+            let start = Instant::now();
+            let _reduce_proof = prover.compress(&vk, core_proof, vec![]);
+            println!(
+                "[{}] prove_core took: {:?}, compress took: {:?}",
+                name,
+                prove_core_took,
+                start.elapsed()
+            );
+
+            // run test with some precompiles/chips deactivated
+            let prover = SP1Prover::new_with_some_chips_disabled(chips_to_deactivate);
+            let start = Instant::now();
+            let core_proof = prover.prove_core(&pk, &input).unwrap();
+            let prove_core_took = start.elapsed();
+            let start = Instant::now();
+            let _reduce_proof = prover.compress(&vk, core_proof, vec![]);
+            println!(
+                "[{}] prove_core took: {:?}, compress took: {:?}",
+                name,
+                prove_core_took,
+                start.elapsed()
+            );
+        }
+
+        let chips_to_deactivate = vec![
+            //"ShaExtend",
+            "ShaCompress",
+            "EdAddAssign",
+            "EdDecompress",
+            "Secp256k1Decompress",
+            "Secp256k1AddAssign",
+            "Secp256k1DoubleAssign",
+            "KeccakPermute",
+            "Bn254AddAssign",
+            "Bn254DoubleAssign",
+            "Bls12381AddAssign",
+            "Bls12381DoubleAssign",
+            "Uint256MulMod",
+            "Bls12381Decompress",
+        ];
+
+        let calls = 200_000usize;
+        let mut input = SP1Stdin::new();
+        input.write(&0usize);
+        input.write(&calls);
+        run_experiment("sha-extend".to_string(), chips_to_deactivate, input); // invoking sha_extend precompile
+
+        let chips_to_deactivate = vec![
+            "ShaExtend",
+            "ShaCompress",
+            "EdAddAssign",
+            "EdDecompress",
+            "Secp256k1Decompress",
+            "Secp256k1AddAssign",
+            //"Secp256k1DoubleAssign",
+            "KeccakPermute",
+            "Bn254AddAssign",
+            "Bn254DoubleAssign",
+            "Bls12381AddAssign",
+            "Bls12381DoubleAssign",
+            "Uint256MulMod",
+            "Bls12381Decompress",
+        ];
+
+        let calls = 1_000_000usize;
+        let mut input = SP1Stdin::new();
+        input.write(&1usize);
+        input.write(&calls);
+        run_experiment("secp256-k1-double".to_string(), chips_to_deactivate, input); // invoking Secp256k1Double precompile
+
+        let chips_to_deactivate = vec![
+            "ShaExtend",
+            "ShaCompress",
+            "EdAddAssign",
+            "EdDecompress",
+            "Secp256k1Decompress",
+            "Secp256k1AddAssign",
+            "Secp256k1DoubleAssign",
+            "KeccakPermute",
+            "Bn254AddAssign",
+            //"Bn254DoubleAssign",
+            "Bls12381AddAssign",
+            "Bls12381DoubleAssign",
+            "Uint256MulMod",
+            "Bls12381Decompress",
+        ];
+
+        let calls = 1_000_000usize;
+        let mut input = SP1Stdin::new();
+        input.write(&2usize);
+        input.write(&calls);
+        run_experiment("bn254-double".to_string(), chips_to_deactivate, input); // invoking Bn254Double precompile
+
+        let chips_to_deactivate = vec![
+            "ShaExtend",
+            "ShaCompress",
+            "EdAddAssign",
+            "EdDecompress",
+            "Secp256k1Decompress",
+            "Secp256k1AddAssign",
+            "Secp256k1DoubleAssign",
+            "KeccakPermute",
+            "Bn254AddAssign",
+            "Bn254DoubleAssign",
+            "Bls12381AddAssign",
+            //"Bls12381DoubleAssign",
+            "Uint256MulMod",
+            "Bls12381Decompress",
+        ];
+
+        let calls = 1_000_000usize;
+        let mut input = SP1Stdin::new();
+        input.write(&3usize);
+        input.write(&calls);
+        run_experiment("bls12381-double".to_string(), chips_to_deactivate, input); // invoking Bls12381Double precompile
     }
 }
