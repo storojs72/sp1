@@ -22,20 +22,18 @@ use std::path::Path;
 use p3_baby_bear::BabyBear;
 use p3_challenger::CanObserve;
 use p3_field::{AbstractField, PrimeField};
-use rayon::prelude::*;
-use sp1_core::air::{PublicValues, Word};
-use sp1_core::runtime::{ExecutionError, ExecutionReport, Runtime};
-use sp1_core::stark::{Challenger, MachineVerificationError};
-use sp1_core::utils::{SP1CoreOpts, DIGEST_SIZE};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+use rayon::prelude::*;
+use sp1_core::air::{MachineAir, SP1_PROOF_NUM_PV_ELTS};
+use sp1_core::air::{PublicValues, Word};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use size::Size;
-use sp1_core::air::{MachineAir, SP1_PROOF_NUM_PV_ELTS};
 pub use sp1_core::io::{SP1PublicValues, SP1Stdin};
-use sp1_core::stark::{
-    Challenge, Chip, Com, Domain, PcsProverData, Prover, ShardMainData, StarkProvingKey,
-};
+use sp1_core::runtime::{ExecutionError, ExecutionReport, Runtime};
+use sp1_core::stark::{Challenge, Com, Domain, PcsProverData, Prover, ShardMainData, Chip, StarkProvingKey};
+use sp1_core::stark::{Challenger, MachineVerificationError};
+use sp1_core::utils::{SP1CoreOpts, DIGEST_SIZE};
 use sp1_core::{
     runtime::Program,
     stark::{
@@ -63,7 +61,6 @@ pub use sp1_recursion_program::machine::{
     SP1DeferredMemoryLayout, SP1RecursionMemoryLayout, SP1ReduceMemoryLayout, SP1RootMemoryLayout,
 };
 use tracing::instrument;
-use sp1_recursion_core::stark::{RecursionAirSkinnyDeg7, RecursionAirWideDeg3};
 pub use types::*;
 use utils::words_to_bytes;
 
@@ -219,7 +216,6 @@ impl SP1Prover {
 
             StarkMachine::new(CoreSC::default(), chips, SP1_PROOF_NUM_PV_ELTS)
         };
-
 
         // Get the recursive verifier and setup the proving and verifying keys.
         let recursion_program = SP1RecursiveVerifier::<InnerConfig, _>::build(&core_machine);
@@ -978,7 +974,9 @@ mod tests {
                     let deferred_proof = prover.prove_core(&program_pk, input).unwrap();
                     let pv = deferred_proof.public_values.as_slice().to_vec().clone();
                     public_values.push(pv);
-                    let deferred_reduce = prover.compress(&program_vk, deferred_proof, vec![]).unwrap();
+                    let deferred_reduce = prover
+                        .compress(&program_vk, deferred_proof, vec![])
+                        .unwrap();
                     deferred_reduce_proofs.push(deferred_reduce.proof);
                 });
 
@@ -999,8 +997,9 @@ mod tests {
 
             // Generate aggregated proof
             let verify_proof = prover.prove_core(&verify_pk, &stdin).unwrap();
-            let verify_reduce =
-                prover.compress(&verify_vk, verify_proof.clone(), deferred_reduce_proofs).unwrap();
+            let verify_reduce = prover
+                .compress(&verify_vk, verify_proof.clone(), deferred_reduce_proofs)
+                .unwrap();
 
             let reduce_pv: &RecursionPublicValues<_> =
                 verify_reduce.proof.public_values.as_slice().borrow();
@@ -1008,7 +1007,9 @@ mod tests {
             println!("complete: {:?}", reduce_pv.is_complete);
 
             tracing::info!("verify verify program");
-            prover.verify_compressed(&verify_reduce, &verify_vk)?;
+            prover
+                .verify_compressed(&verify_reduce, &verify_vk)
+                .unwrap();
         }
 
         //env::set_var("RECONSTRUCT_COMMITMENTS", "false");
@@ -1043,6 +1044,12 @@ mod tests {
         test_inner(multi_precompile_program, inputs.len(), inputs);
     }
 
+    /// Supported shard sizes: ("262144" "524288" "1048576" "2097152" "4194304")
+    ///
+    /// To run this test:
+    ///
+    /// SHARD_SIZE=4194304 FRI_QUERIES=1 RUST_LOG=info RUSTFLAGS='-C target-cpu=native' cargo test test_multi_precompile_program_with_patched_stark_machine --release --package sp1-prover -- --nocapture
+    ///
     #[test]
     fn test_multi_precompile_program_with_patched_stark_machine() {
         setup_logger();
@@ -1060,6 +1067,7 @@ mod tests {
             let prove_core_took = start.elapsed();
             let start = Instant::now();
             let _reduce_proof = prover.compress(&vk, core_proof, vec![]);
+
             println!(
                 "[{}] prove_core took: {:?}, compress took: {:?}",
                 name,
@@ -1075,7 +1083,7 @@ mod tests {
             let start = Instant::now();
             let _reduce_proof = prover.compress(&vk, core_proof, vec![]);
             println!(
-                "[{}] prove_core took: {:?}, compress took: {:?}",
+                "[{}] prove_core took: {:?}, compress took: {:?} [chips deactivated]",
                 name,
                 prove_core_took,
                 start.elapsed()
@@ -1103,7 +1111,7 @@ mod tests {
         let mut input = SP1Stdin::new();
         input.write(&0usize);
         input.write(&calls);
-        run_experiment("sha-extend".to_string(), chips_to_deactivate, input); // invoking sha_extend precompile
+        run_experiment("sha-extend".to_string(), chips_to_deactivate, input);
 
         let chips_to_deactivate = vec![
             "ShaExtend",
@@ -1126,7 +1134,7 @@ mod tests {
         let mut input = SP1Stdin::new();
         input.write(&1usize);
         input.write(&calls);
-        run_experiment("secp256-k1-double".to_string(), chips_to_deactivate, input); // invoking Secp256k1Double precompile
+        run_experiment("secp256-k1-double".to_string(), chips_to_deactivate, input);
 
         let chips_to_deactivate = vec![
             "ShaExtend",
@@ -1149,7 +1157,7 @@ mod tests {
         let mut input = SP1Stdin::new();
         input.write(&2usize);
         input.write(&calls);
-        run_experiment("bn254-double".to_string(), chips_to_deactivate, input); // invoking Bn254Double precompile
+        run_experiment("bn254-double".to_string(), chips_to_deactivate, input);
 
         let chips_to_deactivate = vec![
             "ShaExtend",
@@ -1172,6 +1180,6 @@ mod tests {
         let mut input = SP1Stdin::new();
         input.write(&3usize);
         input.write(&calls);
-        run_experiment("bls12381-double".to_string(), chips_to_deactivate, input); // invoking Bls12381Double precompile
+        run_experiment("bls12381-double".to_string(), chips_to_deactivate, input);
     }
 }

@@ -238,7 +238,7 @@ pub fn run_test_io_custom(
     let runtime = tracing::info_span!("runtime.run(...)").in_scope(|| {
         let mut runtime = Runtime::new(program);
         runtime.write_vecs(&inputs.buffer);
-        runtime.run();
+        runtime.run().unwrap();
         runtime
     });
     let public_values = SP1PublicValues::from(&runtime.state.public_values_stream);
