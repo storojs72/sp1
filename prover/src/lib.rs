@@ -1044,51 +1044,50 @@ mod tests {
         test_inner(multi_precompile_program, inputs.len(), inputs);
     }
 
+    fn run_experiment(name: String, chips_to_deactivate: Vec<&str>, input: SP1Stdin) {
+        let multi_precompile_program =
+            include_bytes!("../../tests/multi-precompile-program/elf/riscv32im-succinct-zkvm-elf");
+
+        // run test with all precompiles/chips enabled
+        let prover = SP1Prover::new();
+        let (pk, vk) = prover.setup(multi_precompile_program);
+        let start = Instant::now();
+        let core_proof = prover.prove_core(&pk, &input).unwrap();
+        let prove_core_took = start.elapsed();
+        let start = Instant::now();
+        let _reduce_proof = prover.compress(&vk, core_proof, vec![]);
+
+        println!(
+            "[{}] prove_core took: {:?}, compress took: {:?}",
+            name,
+            prove_core_took,
+            start.elapsed()
+        );
+
+        // run test with some precompiles/chips deactivated
+        let prover = SP1Prover::new_with_some_chips_disabled(chips_to_deactivate);
+        let start = Instant::now();
+        let core_proof = prover.prove_core(&pk, &input).unwrap();
+        let prove_core_took = start.elapsed();
+        let start = Instant::now();
+        let _reduce_proof = prover.compress(&vk, core_proof, vec![]);
+        println!(
+            "[{}] prove_core took: {:?}, compress took: {:?} [chips deactivated]",
+            name,
+            prove_core_took,
+            start.elapsed()
+        );
+    }
+
     /// Supported shard sizes: ("262144" "524288" "1048576" "2097152" "4194304")
     ///
-    /// To run this test:
+    /// To run those tests:
     ///
     /// SHARD_SIZE=4194304 FRI_QUERIES=1 RUST_LOG=info RUSTFLAGS='-C target-cpu=native' cargo test test_multi_precompile_program_with_patched_stark_machine --release --package sp1-prover -- --nocapture
     ///
     #[test]
-    fn test_multi_precompile_program_with_patched_stark_machine() {
+    fn test_multi_precompile_program_with_patched_stark_machine_sha_extend() {
         setup_logger();
-
-        fn run_experiment(name: String, chips_to_deactivate: Vec<&str>, input: SP1Stdin) {
-            let multi_precompile_program = include_bytes!(
-                "../../tests/multi-precompile-program/elf/riscv32im-succinct-zkvm-elf"
-            );
-
-            // run test with all precompiles/chips enabled
-            let prover = SP1Prover::new();
-            let (pk, vk) = prover.setup(multi_precompile_program);
-            let start = Instant::now();
-            let core_proof = prover.prove_core(&pk, &input).unwrap();
-            let prove_core_took = start.elapsed();
-            let start = Instant::now();
-            let _reduce_proof = prover.compress(&vk, core_proof, vec![]);
-
-            println!(
-                "[{}] prove_core took: {:?}, compress took: {:?}",
-                name,
-                prove_core_took,
-                start.elapsed()
-            );
-
-            // run test with some precompiles/chips deactivated
-            let prover = SP1Prover::new_with_some_chips_disabled(chips_to_deactivate);
-            let start = Instant::now();
-            let core_proof = prover.prove_core(&pk, &input).unwrap();
-            let prove_core_took = start.elapsed();
-            let start = Instant::now();
-            let _reduce_proof = prover.compress(&vk, core_proof, vec![]);
-            println!(
-                "[{}] prove_core took: {:?}, compress took: {:?} [chips deactivated]",
-                name,
-                prove_core_took,
-                start.elapsed()
-            );
-        }
 
         let chips_to_deactivate = vec![
             //"ShaExtend",
@@ -1107,12 +1106,16 @@ mod tests {
             "Bls12381Decompress",
         ];
 
-        let calls = 200_000usize;
+        let calls = env::var("CALLS").unwrap_or("200000".to_string());
+        let calls = calls.parse::<usize>().unwrap();
         let mut input = SP1Stdin::new();
         input.write(&0usize);
         input.write(&calls);
         run_experiment("sha-extend".to_string(), chips_to_deactivate, input);
+    }
 
+    #[test]
+    fn test_multi_precompile_program_with_patched_stark_machine_secp_double() {
         let chips_to_deactivate = vec![
             "ShaExtend",
             "ShaCompress",
@@ -1130,12 +1133,16 @@ mod tests {
             "Bls12381Decompress",
         ];
 
-        let calls = 1_000_000usize;
+        let calls = env::var("CALLS").unwrap_or("1000000".to_string());
+        let calls = calls.parse::<usize>().unwrap();
         let mut input = SP1Stdin::new();
         input.write(&1usize);
         input.write(&calls);
         run_experiment("secp256-k1-double".to_string(), chips_to_deactivate, input);
+    }
 
+    #[test]
+    fn test_multi_precompile_program_with_patched_stark_machine_bn254_double() {
         let chips_to_deactivate = vec![
             "ShaExtend",
             "ShaCompress",
@@ -1153,12 +1160,16 @@ mod tests {
             "Bls12381Decompress",
         ];
 
-        let calls = 1_000_000usize;
+        let calls = env::var("CALLS").unwrap_or("1000000".to_string());
+        let calls = calls.parse::<usize>().unwrap();
         let mut input = SP1Stdin::new();
         input.write(&2usize);
         input.write(&calls);
         run_experiment("bn254-double".to_string(), chips_to_deactivate, input);
+    }
 
+    #[test]
+    fn test_multi_precompile_program_with_patched_stark_machine_bls12381_double() {
         let chips_to_deactivate = vec![
             "ShaExtend",
             "ShaCompress",
@@ -1176,7 +1187,8 @@ mod tests {
             "Bls12381Decompress",
         ];
 
-        let calls = 1_000_000usize;
+        let calls = env::var("CALLS").unwrap_or("1000000".to_string());
+        let calls = calls.parse::<usize>().unwrap();
         let mut input = SP1Stdin::new();
         input.write(&3usize);
         input.write(&calls);
