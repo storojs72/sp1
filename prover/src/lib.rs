@@ -1044,7 +1044,7 @@ mod tests {
         test_inner(multi_precompile_program, inputs.len(), inputs);
     }
 
-    fn run_experiment(name: String, chips_to_deactivate: Vec<&str>, input: SP1Stdin) {
+    fn run_experiment(name: String, _chips_to_deactivate: Vec<&str>, input: SP1Stdin) {
         let multi_precompile_program =
             include_bytes!("../../tests/multi-precompile-program/elf/riscv32im-succinct-zkvm-elf");
 
@@ -1064,6 +1064,7 @@ mod tests {
             start.elapsed()
         );
 
+        /*
         // run test with some precompiles/chips deactivated
         let prover = SP1Prover::new_with_some_chips_disabled(chips_to_deactivate);
         let start = Instant::now();
@@ -1077,6 +1078,7 @@ mod tests {
             prove_core_took,
             start.elapsed()
         );
+        */
     }
 
     /// Supported shard sizes: ("262144" "524288" "1048576" "2097152" "4194304")
