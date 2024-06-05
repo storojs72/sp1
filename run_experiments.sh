@@ -5,6 +5,7 @@ FRI_QUERIES_INNER=1
 
 echo "CALLS: $CALLS_INNER"
 echo "FRI_QUERIES: $FRI_QUERIES_INNER"
+echo "\n"
 
 for reconstruct_commitment in "true" "false"
 do
@@ -38,4 +39,4 @@ done
 # > bash run_experiments.sh >> sha_extend.txt
 #
 # Then to clean up the results:
-# > cat sha_extend.txt |  grep -v '^[running]' | grep -v '^[test result]' > sha_extend_clean.txt && sed '/^$/N;/^\n$/D' sha_extend_clean.txt > sha_extend_results.txt
+# > cat sha_extend.txt |  grep -v '^[running]' | grep -v '^[test result]' | sed '/^$/N;/^\n$/D' > sha_extend_clean.txt

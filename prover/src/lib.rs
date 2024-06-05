@@ -22,16 +22,13 @@ use std::path::Path;
 use p3_baby_bear::BabyBear;
 use p3_challenger::CanObserve;
 use p3_field::{AbstractField, PrimeField};
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rayon::prelude::*;
 use sp1_core::air::{MachineAir, SP1_PROOF_NUM_PV_ELTS};
 use sp1_core::air::{PublicValues, Word};
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-use size::Size;
 pub use sp1_core::io::{SP1PublicValues, SP1Stdin};
 use sp1_core::runtime::{ExecutionError, ExecutionReport, Runtime};
-use sp1_core::stark::{Challenge, Com, Domain, PcsProverData, Prover, ShardMainData, Chip, StarkProvingKey};
+use sp1_core::stark::{Challenge, Chip, StarkProvingKey};
 use sp1_core::stark::{Challenger, MachineVerificationError};
 use sp1_core::utils::{SP1CoreOpts, DIGEST_SIZE};
 use sp1_core::{
@@ -1108,7 +1105,7 @@ mod tests {
             "Bls12381Decompress",
         ];
 
-        let calls = env::var("CALLS").unwrap_or("200000".to_string());
+        let calls = std::env::var("CALLS").unwrap_or("200000".to_string());
         let calls = calls.parse::<usize>().unwrap();
         let mut input = SP1Stdin::new();
         input.write(&0usize);
@@ -1135,7 +1132,7 @@ mod tests {
             "Bls12381Decompress",
         ];
 
-        let calls = env::var("CALLS").unwrap_or("1000000".to_string());
+        let calls = std::env::var("CALLS").unwrap_or("1000000".to_string());
         let calls = calls.parse::<usize>().unwrap();
         let mut input = SP1Stdin::new();
         input.write(&1usize);
@@ -1162,7 +1159,7 @@ mod tests {
             "Bls12381Decompress",
         ];
 
-        let calls = env::var("CALLS").unwrap_or("1000000".to_string());
+        let calls = std::env::var("CALLS").unwrap_or("1000000".to_string());
         let calls = calls.parse::<usize>().unwrap();
         let mut input = SP1Stdin::new();
         input.write(&2usize);
@@ -1189,7 +1186,7 @@ mod tests {
             "Bls12381Decompress",
         ];
 
-        let calls = env::var("CALLS").unwrap_or("1000000".to_string());
+        let calls = std::env::var("CALLS").unwrap_or("1000000".to_string());
         let calls = calls.parse::<usize>().unwrap();
         let mut input = SP1Stdin::new();
         input.write(&3usize);

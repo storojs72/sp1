@@ -236,7 +236,7 @@ pub fn run_test_io_custom(
     chip_names_to_deactivate: Vec<&str>,
 ) -> Result<SP1PublicValues, crate::stark::MachineVerificationError<BabyBearPoseidon2>> {
     let runtime = tracing::info_span!("runtime.run(...)").in_scope(|| {
-        let mut runtime = Runtime::new(program);
+        let mut runtime = Runtime::new(program, SP1CoreOpts::default());
         runtime.write_vecs(&inputs.buffer);
         runtime.run().unwrap();
         runtime
